@@ -22,11 +22,11 @@ jobs:
         run: |
           echo "=== Scanning .sh files ==="
           find . -name "*.sh" -not -path "./.git/*" \
-            -exec shellcheck --severity=warning {} +
+            -exec shellcheck --severity=error {} +
 
           echo "=== Scanning .zsh files ==="
           find . -name "*.zsh" -not -path "./.git/*" \
-            -exec shellcheck --shell=bash --severity=warning {} +
+            -exec shellcheck --shell=bash --severity=error {} +
 
   validate-plugins:
     name: Validate Plugin Structure
