@@ -17,7 +17,6 @@ ZL_PLUGINS_DIR="${ZL_HOME}/plugins"
 ZL_CONF="${ZL_HOME}/core/plugins.conf"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
-# shellcheck disable=SC2034
 if [[ -t 1 ]]; then
   C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'
   C_BLUE=$'\033[1;34m'; C_CYAN=$'\033[0;36m'
@@ -543,15 +542,15 @@ check_config() {
   # User config
   local user_cfg="${ZDOTDIR:-$HOME}/.zerolinuxrc"
   if [[ -f "$user_cfg" ]]; then
-    _pass "$HOME/.zerolinuxrc: present"
+    _pass "~/.zerolinuxrc: present"
     if [[ -r "$user_cfg" ]]; then
-      _pass "$HOME/.zerolinuxrc: readable"
+      _pass "~/.zerolinuxrc: readable"
     else
-      _fail "$HOME/.zerolinuxrc: not readable"
+      _fail "~/.zerolinuxrc: not readable"
       _hint "Fix: chmod 600 $user_cfg"
     fi
   else
-    _info "$HOME/.zerolinuxrc: not found (optional — create to override defaults)"
+    _info "~/.zerolinuxrc: not found (optional — create to override defaults)"
   fi
 
   # Default config
