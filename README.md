@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![Shell](https://img.shields.io/badge/shell-zsh%205.3%2B-orange?style=flat-square)](https://www.zsh.org/)
 
-[Install](#-quick-install) · [Plugins](#-plugins) · [CLI](#-cli-reference) · [Docs](docs/README.md)
+[Install](#-quick-install) · [Plugins](#-plugins) · [CLI](#-cli-reference) · [Docs](././docs/README.md)
 
 </div>
 
@@ -271,7 +271,7 @@ Removes the block from `.zshrc`, deletes `~/.zerolinux`, removes the `zl` symlin
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). The short version:
+See [CONTRIBUTING.md](./CONTRIBUTING.md). The short version:
 
 1. Fork → branch → change → test (`make test`) → PR
 2. All PRs run CI automatically
