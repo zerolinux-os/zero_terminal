@@ -25,8 +25,8 @@ makes it better for everyone.
 
 ```bash
 # Fork the repo on GitHub, then:
-git clone https://github.com/YOUR_USERNAME/zerolinux-os.git
-cd terminal
+git clone https://github.com/YOUR_USERNAME/zero_terminal.git
+cd zero_terminal
 make test    # verify everything passes before you change anything
 ```
 
@@ -189,13 +189,13 @@ ZL_STRICT_SAFETY=1 zsh -c "
 
 ### Naming
 
-| Scope | Convention | Example |
-|-------|-----------|---------|
-| Core functions | `zl::module::name` | `zl::plugin::load_now` |
-| Plugin functions | `zl_pluginname_name` | `zl_git_branch` |
-| Private helpers | `_zl::module::name` | `_zl::log::write` |
-| Global variables | `ZL_UPPERCASE` | `ZL_PLUGIN_LOADED` |
-| Temp variables | `typeset _zl_name` | `typeset _zl_t0` |
+| Scope           | Convention          | Example                  |
+|-----------------|---------------------|--------------------------|
+| Core functions  | `zl::module::name`  | `zl::plugin::load_now`   |
+| Plugin functions| `zl_pluginname_name`| `zl_git_branch`          |
+| Private helpers | `_zl::module::name` | `_zl::log::write`        |
+| Global variables| `ZL_UPPERCASE`      | `ZL_PLUGIN_LOADED`       |
+| Temp variables  | `typeset _zl_name`  | `typeset _zl_t0`         |
 
 ### Zsh-specific rules
 
