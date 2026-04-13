@@ -13,7 +13,7 @@
 
 **A Zsh framework that starts fast, isolates plugins, and tells you exactly what's happening.**
 
-[![asciicast](https://asciinema.org/a/bUE5ZY3v74Xyhn3s.png)](https://asciinema.org/a/bUE5ZY3v74Xyhn3s)
+![ZeroLinux Terminal Demo](assets/demo.gif)
 
 [![Version](https://img.shields.io/badge/version-2.1.1-blue?style=flat-square)](https://github.com/zerolinux-os/zero_terminal/releases)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
