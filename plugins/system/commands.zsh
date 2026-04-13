@@ -19,7 +19,7 @@ alias free='free -h'
 alias ps='ps auxf'
 alias ports='ss -tulpn'
 alias myip='curl -s ifconfig.me && echo'
-alias localip="ip -br addr | grep -v '^lo' | awk '{print \$1, \$3}'"
+localip() { ip -br addr | grep -v '^lo' | awk '{print $1, $3}'; }
 
 # Pacman shortcuts (Arch only)
 if [[ -f /etc/arch-release ]]; then
@@ -139,7 +139,8 @@ portopen() {
 
 # ── dus — disk usage sorted ───────────────────────────────────────────────────
 dus() {
-  du -sh -- "${@:-.}"/* 2>/dev/null | sort -rh | head -20
+  local target="${1:-.}"
+  du -sh -- "$target"/* 2>/dev/null | sort -rh | head -20
 }
 
 # ── psg — grep running processes ─────────────────────────────────────────────
