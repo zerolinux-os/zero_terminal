@@ -17,14 +17,32 @@
 
 <img width="1908" height="1012" alt="screenshot" src="https://github.com/user-attachments/assets/3e76259c-fa79-4aca-b03a-a27b08e58c45" />
 
-
+[![CI](https://github.com/zerolinux-os/zero_terminal/actions/workflows/ci.yml/badge.svg)](https://github.com/zerolinux-os/zero_terminal/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-2.1.1-blue?style=flat-square)](https://github.com/zerolinux-os/zero_terminal/releases)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![Shell](https://img.shields.io/badge/shell-zsh%205.3%2B-orange?style=flat-square)](https://www.zsh.org/)
+[![Stars](https://img.shields.io/github/stars/zerolinux-os/zero_terminal?style=flat-square)](https://github.com/zerolinux-os/zero_terminal/stargazers)
 
-[Install](#-quick-install) · [Plugins](#-plugins) · [CLI](#-cli-reference) · [Docs](./docs/README.md)
+[Install](#-quick-install) · [Plugins](#-plugins) · [CLI](#-cli-reference) · [Docs](./docs/README.md) · [Why ZeroLinux?](#-why-zerolinux)
 
 </div>
+
+---
+
+## 🤔 Why ZeroLinux?
+
+> Tired of oh-my-zsh slowing your shell? Frustrated by zinit's complexity? ZeroLinux does one thing well: **it loads fast, stays transparent, and never surprises you.**
+
+| Feature | ZeroLinux | oh-my-zsh | zinit |
+|---------|:---------:|:---------:|:-----:|
+| Startup time | ⚡ ~20ms | 🐢 200-500ms | ⚡ ~30ms |
+| Plugin isolation | ✅ | ❌ | ❌ |
+| Security scanning | ✅ | ❌ | ❌ |
+| Safe backup & rollback | ✅ | ❌ | ❌ |
+| Health diagnostics (`zl doctor`) | ✅ | ❌ | ❌ |
+| No hidden magic | ✅ | ❌ | ❌ |
+| Single install command | ✅ | ✅ | ✅ |
+| Arch Linux native support | ✅ | ❌ | ❌ |
 
 ---
 
@@ -40,8 +58,6 @@ Watch the demo above to see ZeroLinux in action:
 ---
 
 ## 🚀 Quick Install
-
-To replicate the demo, run the following commands:
 
 ```bash
 # 1. Clone the repository
@@ -224,26 +240,6 @@ Flags:
 
 ---
 
-## CLI preview
-
-### Example
-
-```bash
-zl help
-
-zl <command> [subcommand]
-
-Plugin management:
-  enable plugin <name>
-  disable plugin <name>
-
-System:
-  doctor
-  reload
-```
-
----
-
 ## Configuration
 
 Override defaults in `~/.zerolinuxrc` — ZeroLinux sources it automatically:
@@ -371,3 +367,4 @@ Built with zsh, fzf, and a lot of time spent staring at startup traces. Inspired
 [Report a bug](https://github.com/zerolinux-os/zero_terminal/issues/new?template=bug_report.yml) · [Request a feature](https://github.com/zerolinux-os/zero_terminal/issues/new?template=feature_request.yml) · [Sponsor](https://github.com/sponsors/zerolinux)
 
 </div>
+
