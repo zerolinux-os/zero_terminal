@@ -1,0 +1,42 @@
+{
+  "_comment": "ZeroLinux Plugin Registry — add entries to publish plugins",
+  "_version": "1",
+  "plugins": [
+    {
+      "name": "git",
+      "description": "Interactive Git tools (branch switcher, log browser, stash manager)",
+      "version": "2.1.1",
+      "source": "bundled",
+      "url": null,
+      "requires_zl": "2.0.0",
+      "tags": ["git", "vcs", "fzf"]
+    },
+    {
+      "name": "system",
+      "description": "System monitoring: sysinfo, memtop, fkill, portopen",
+      "version": "2.1.1",
+      "source": "bundled",
+      "url": null,
+      "requires_zl": "2.0.0",
+      "tags": ["system", "monitoring"]
+    },
+    {
+      "name": "docker",
+      "description": "Docker aliases and interactive container management",
+      "version": "2.1.1",
+      "source": "bundled",
+      "url": null,
+      "requires_zl": "2.0.0",
+      "tags": ["docker", "containers"]
+    },
+    {
+      "name": "arch",
+      "description": "Arch Linux pacman and AUR helper utilities",
+      "version": "2.1.1",
+      "source": "bundled",
+      "url": null,
+      "requires_zl": "2.0.0",
+      "tags": ["arch", "pacman", "aur"]
+    }
+  ]
+}

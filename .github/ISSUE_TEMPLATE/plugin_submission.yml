@@ -1,0 +1,77 @@
+name: Plugin Submission
+description: Submit a new plugin for inclusion in ZeroLinux
+title: "[plugin]: "
+labels: ["plugin", "needs-review"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Submitting a plugin for inclusion in the core repo means it will be
+        maintained by the ZeroLinux team going forward. Read
+        [CONTRIBUTING.md](../CONTRIBUTING.md#plugin-development) before submitting.
+
+  - type: input
+    id: plugin_name
+    attributes:
+      label: Plugin name
+      placeholder: "kubectl"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What does this plugin do?
+      description: One paragraph. Who needs it and what does it enable?
+    validations:
+      required: true
+
+  - type: input
+    id: repo_link
+    attributes:
+      label: Link to plugin code
+      description: GitHub repo, gist, or PR with the plugin files
+      placeholder: "https://github.com/username/zl-plugin-kubectl"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contract
+    attributes:
+      label: Plugin contract compliance
+      description: All must be checked before the submission will be reviewed.
+      options:
+        - label: Has `plugin.zl` with name, version, description, requires_zl
+          required: true
+        - label: Has `init.zsh` that defines `plugin_init()` and `plugin_register_commands()`
+          required: true
+        - label: Has `commands.zsh` that does NOT source itself from `init.zsh`
+          required: true
+        - label: All functions are prefixed `zl_pluginname_*`
+          required: true
+        - label: All variables are `local` or `typeset`
+          required: true
+        - label: Passes `ZL_STRICT_SAFETY=1` scanner with zero findings
+          required: true
+        - label: Dependency guard at top of `init.zsh` (returns 0 if dep missing)
+          required: true
+
+  - type: textarea
+    id: commands
+    attributes:
+      label: Commands and aliases provided
+      description: List every function and alias the plugin adds to the user's shell.
+      placeholder: |
+        kctx  — fzf context switcher
+        kns   — fzf namespace switcher
+        klog  — stream pod logs with selector
+    validations:
+      required: true
+
+  - type: input
+    id: dependencies
+    attributes:
+      label: External dependencies
+      description: Tools that must be installed (e.g. kubectl, fzf, jq)
+      placeholder: "kubectl, fzf"

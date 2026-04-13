@@ -1,0 +1,27 @@
+# ZeroLinux CODEOWNERS
+# Reviewers are automatically assigned based on changed paths.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+*                   @zerolinux/maintainers
+
+# Core framework — requires maintainer review
+/core/              @zerolinux/maintainers
+/bin/               @zerolinux/maintainers
+install.sh          @zerolinux/maintainers
+uninstall.sh        @zerolinux/maintainers
+
+# Security-sensitive files
+SECURITY.md         @zerolinux/maintainers
+doctor.sh           @zerolinux/maintainers
+
+# Plugins — can be reviewed by contributors
+/plugins/           @zerolinux/maintainers @zerolinux/contributors
+
+# Docs
+/docs/              @zerolinux/maintainers
+README.md           @zerolinux/maintainers
+CONTRIBUTING.md     @zerolinux/maintainers
+
+# CI
+/.github/           @zerolinux/maintainers

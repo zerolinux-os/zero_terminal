@@ -1,0 +1,683 @@
+#!/usr/bin/env bash
+# =============================================================================
+# ZeroLinux Terminal Framework v2 — bin/zl
+# The real CLI. Every command is a discrete function. No eval. No shortcuts.
+#
+# Design principles:
+#   - Set -uo pipefail but NOT -e (CLI must survive partial failures)
+#   - All destructive ops ask for confirmation unless --yes/-y passed
+#   - Output is always structured: section headers, aligned columns, colors
+#   - Integrates with zl::plugin::* API from plugin_manager.zsh
+#   - Every exit path is explicit and logged
+# =============================================================================
+set -uo pipefail
+
+# ── Runtime detection ─────────────────────────────────────────────────────────
+ZL_HOME="${ZL_HOME:-$HOME/.zerolinux}"
+ZL_LOG="${ZL_HOME}/logs/zl.log"
+ZL_PLUGINS_DIR="${ZL_HOME}/plugins"
+ZL_CONF="${ZL_HOME}/core/plugins.conf"
+ZL_VERSION="$(cat "$ZL_HOME/VERSION" 2>/dev/null || echo "2.1.1")"
+ZL_YES=0   # set to 1 by --yes/-y
+
+# ── ANSI palette ──────────────────────────────────────────────────────────────
+if [[ -t 1 ]]; then
+  C_RESET=$'\033[0m'
+  C_BOLD=$'\033[1m'
+  C_DIM=$'\033[2m'
+  C_BLUE=$'\033[1;34m'
+  C_CYAN=$'\033[0;36m'
+  C_GREEN=$'\033[0;32m'
+  C_YELLOW=$'\033[1;33m'
+  C_RED=$'\033[1;31m'
+  C_PURPLE=$'\033[0;35m'
+  C_WHITE=$'\033[1;37m'
+  C_GRAY=$'\033[2;37m'
+else
+  C_RESET='' C_BOLD='' C_DIM='' C_BLUE='' C_CYAN=''
+  C_GREEN='' C_YELLOW='' C_RED='' C_PURPLE='' C_WHITE='' C_GRAY=''
+fi
+
+# ── Output helpers ────────────────────────────────────────────────────────────
+_ok()      { printf "  ${C_GREEN}✓${C_RESET}  %s\n"              "$*"; }
+_warn()    { printf "  ${C_YELLOW}!${C_RESET}  %s\n"             "$*"; }
+_err()     { printf "  ${C_RED}✗${C_RESET}  %s\n"               "$*" >&2; }
+_info()    { printf "  ${C_CYAN}→${C_RESET}  %s\n"              "$*"; }
+_dim()     { printf "  ${C_GRAY}·${C_RESET}  %s\n"              "$*"; }
+_section() { printf "\n${C_BLUE}${C_BOLD}━━━ %s ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}\n" "$*"; }
+_sep()     { printf "${C_BLUE}${C_DIM}%s${C_RESET}\n" "─────────────────────────────────────────────────────"; }
+
+# Right-aligned 2-column row
+_row() {
+  local label="$1" value="$2"
+  printf "  ${C_CYAN}%-20s${C_RESET}%s\n" "$label" "$value"
+}
+
+# ── Logger (writes to file; never crashes) ────────────────────────────────────
+_log() {
+  mkdir -p "$(dirname "$ZL_LOG")" 2>/dev/null || true
+  printf '[%s] [zl] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" \
+    >> "$ZL_LOG" 2>/dev/null || true
+}
+
+# ── Input validation ──────────────────────────────────────────────────────────
+_valid_name() {
+  [[ "${1:-}" =~ ^[a-zA-Z0-9_-]+$ ]]
+}
+
+# ── Confirmation prompt ───────────────────────────────────────────────────────
+_confirm() {
+  local prompt="${1:-Continue?}"
+  (( ZL_YES )) && return 0
+  printf "  ${C_YELLOW}?${C_RESET}  %s [y/N] " "$prompt"
+  local reply
+  read -r reply
+  [[ "$reply" =~ ^[Yy]$ ]]
+}
+
+# ── plugins.conf helpers ──────────────────────────────────────────────────────
+_conf_enabled() {
+  # List all enabled plugin names from plugins.conf
+  local -a names=()
+  [[ -f "$ZL_CONF" ]] || { echo; return 0; }
+  local line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "$line" || "$line" == \#* ]] && continue
+    names+=("$line")
+  done < "$ZL_CONF"
+  printf '%s\n' "${names[@]}"
+}
+
+_conf_is_enabled() {
+  local name="$1"
+  grep -qxF "$name" "$ZL_CONF" 2>/dev/null
+}
+
+_conf_add() {
+  local name="$1"
+  mkdir -p "$(dirname "$ZL_CONF")"
+  _conf_is_enabled "$name" && return 0
+  printf '%s\n' "$name" >> "$ZL_CONF"
+}
+
+_conf_remove() {
+  local name="$1"
+  [[ -f "$ZL_CONF" ]] || return 0
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    sed -i '' "/^${name}[[:space:]]*$/d" "$ZL_CONF" 2>/dev/null
+  else
+    sed -i "/^${name}[[:space:]]*$/d" "$ZL_CONF" 2>/dev/null
+  fi
+}
+
+# ── Plugin metadata reader (standalone, no zsh sourcing needed) ───────────────
+_plugin_meta() {
+  local plugin="$1" key="$2"
+  local meta="$ZL_PLUGINS_DIR/$plugin/plugin.zl"
+  [[ -f "$meta" ]] || { echo ""; return; }
+  grep "^${key}[[:space:]]*=" "$meta" 2>/dev/null | head -1 | \
+    sed 's/^[^=]*=[[:space:]]*//' | sed 's/[[:space:]]*$//'
+}
+
+# ── Dangerous alias/function detection ───────────────────────────────────────
+# ── Safety scanner (mirrors plugin_manager.zsh — keep in sync) ───────────────
+_check_plugin_safety() {
+  local plugin="$1"
+  local plugin_dir="$ZL_PLUGINS_DIR/$plugin"
+  local issues=0
+  local f fname
+
+  for f in "$plugin_dir"/*.zsh; do
+    [[ -f "$f" ]] || continue
+    fname="$(basename "$f")"
+    local detected=0
+
+    grep -Eq 'alias[[:space:]]+(rm|kill|sudo|chmod|chown|mv|cp|cd|ls)[[:space:]]*=' \
+      "$f" 2>/dev/null && (( detected++ )) && \
+      _warn "SECURITY [$plugin/$fname]: overrides a critical command alias"
+
+    grep -Eq 'function[[:space:]]+(rm|kill|sudo|chmod|chown|cd)[[:space:]]*([\(\{]|$)' \
+      "$f" 2>/dev/null && (( detected++ )) && \
+      _warn "SECURITY [$plugin/$fname]: redefines a critical system function"
+
+    grep -Eq '(curl|wget)[^|]*\|[[:space:]]*(sh|bash|zsh)' \
+      "$f" 2>/dev/null && (( detected++ )) && \
+      _warn "SECURITY [$plugin/$fname]: pipes remote content to shell (RCE risk)"
+
+    grep -Eq 'eval[[:space:]]+["'"'"']?\$' \
+      "$f" 2>/dev/null && (( detected++ )) && \
+      _warn "SECURITY [$plugin/$fname]: uses eval with variable input"
+
+    (( detected > 0 )) && issues=$(( issues + 1 ))
+  done
+
+  (( issues > 0 )) && _warn "Plugin '$plugin': security concerns in $issues file(s) — review before enabling"
+  return $issues
+}
+
+# =============================================================================
+# COMMANDS
+# =============================================================================
+
+# ── zl help ───────────────────────────────────────────────────────────────────
+cmd_help() {
+  printf "\n"
+  printf "${C_BLUE}${C_BOLD}"
+  printf " ______               _      _\n"
+  printf "|___  /              | |    (_)\n"
+  printf "   / /  ___ _ __ ___ | |     _ _ __  _  _\n"
+  printf "  / /  / _ \\ '__/ _ \\| |    | | '_ \\| | | |\n"
+  printf "${C_RED}${C_BOLD}"
+  printf " / /__|  __/ | | (_) | |____| | | | | |_| |\n"
+  printf "/_____/\\___|_|  \\___/|______|_|_| |_|\\__,_|\n"
+  printf "${C_RESET}"
+  printf "\n  ${C_WHITE}ZeroLinux Terminal Framework${C_RESET}  ${C_GRAY}CLI v%s${C_RESET}\n\n" "$ZL_VERSION"
+
+  printf "  ${C_BOLD}Usage:${C_RESET} zl <command> [subcommand] [args] [--yes]\n\n"
+
+  printf "  ${C_CYAN}${C_BOLD}Plugin Management:${C_RESET}\n"
+  printf "  ${C_YELLOW}%-32s${C_RESET}%s\n" \
+    "install plugin <name>"    "Install and enable a plugin" \
+    "remove  plugin <name>"    "Disable and remove a plugin" \
+    "enable  plugin <name>"    "Enable an installed plugin" \
+    "disable plugin <name>"    "Disable a plugin (keep files)" \
+    "list    plugins"          "List all plugins with status" \
+    "list    installed"        "List only enabled plugins" \
+    "registry list"         "Browse available plugins"
+
+  printf "\n  ${C_CYAN}${C_BOLD}System:${C_RESET}\n"
+  printf "  ${C_YELLOW}%-32s${C_RESET}%s\n" \
+    "doctor"                   "Deep system health diagnostics" \
+    "reload"                   "Reload ZeroLinux in current shell" \
+    "version"                  "Show version information" \
+    "help"                     "Show this screen"
+
+  printf "\n  ${C_CYAN}${C_BOLD}Flags:${C_RESET}\n"
+  printf "  ${C_GRAY}%-32s${C_RESET}%s\n" \
+    "--yes, -y"                "Skip confirmation prompts" \
+    "ZL_SAFE_MODE=1 zsh"       "Start shell without any plugins" \
+    "ZL_LOG_LEVEL=0 zsh"       "Enable debug logging" \
+    "ZL_TELEMETRY=1 zsh"    "Log startup timing (no network)" \
+    "ZL_STRICT_SAFETY=1"    "Block plugins with security issues"
+
+  printf "\n  ${C_CYAN}${C_BOLD}Shell aliases:${C_RESET}\n"
+  printf "  ${C_GRAY}%-32s${C_RESET}%s\n" \
+    "zl-reload"                "Reload config in current session" \
+    "zl-safe"                  "Launch safe shell (no plugins)" \
+    "zl-log"                   "Tail the ZL log file"
+  printf "\n"
+}
+
+# ── zl version ────────────────────────────────────────────────────────────────
+cmd_version() {
+  _section "ZeroLinux Version"
+  _row "Framework:"  "v${ZL_VERSION}"
+  _row "ZL_HOME:"    "$ZL_HOME"
+  _row "Shell:"      "${ZSH_VERSION:-$(zsh --version 2>/dev/null | awk '{print $2}') }"
+  _row "Config:"     "${ZL_CONF}"
+
+  local plugin_count=0
+  [[ -d "$ZL_PLUGINS_DIR" ]] && \
+    plugin_count=$(find "$ZL_PLUGINS_DIR" -name 'plugin.zl' 2>/dev/null | wc -l | tr -d ' ')
+  _row "Plugins:"    "${plugin_count} installed"
+
+  local enabled_count=0
+  [[ -f "$ZL_CONF" ]] && \
+    enabled_count=$(grep -c '^[^#[:space:]]' "$ZL_CONF" 2>/dev/null || echo 0)
+  _row "Enabled:"    "${enabled_count} active"
+  printf "\n"
+}
+
+# ── zl install plugin <name> ──────────────────────────────────────────────────
+cmd_install_plugin() {
+  local name="${1:-}"
+  if [[ -z "$name" ]]; then
+    _err "Usage: zl install plugin <name>"
+    return 1
+  fi
+  if ! _valid_name "$name"; then
+    _err "Invalid plugin name: '$name'  (allowed: [a-zA-Z0-9_-])"
+    return 1
+  fi
+
+  _section "Install Plugin: $name"
+  _log "install plugin $name"
+
+  local plugin_dir="$ZL_PLUGINS_DIR/$name"
+
+  # Must already exist on disk (we don't do remote install here)
+  if [[ ! -d "$plugin_dir" ]]; then
+    _err "Plugin not found on disk: $plugin_dir"
+    _info "Place the plugin directory there first, then run: zl install plugin $name"
+    return 1
+  fi
+
+  # Validate structure
+  if [[ ! -f "$plugin_dir/init.zsh" ]]; then
+    _err "Plugin is missing init.zsh — cannot install"
+    return 1
+  fi
+
+  # Check plugin.zl
+  if [[ ! -f "$plugin_dir/plugin.zl" ]]; then
+    _warn "plugin.zl metadata file missing — install will proceed with defaults"
+  else
+    local ver desc deps
+    ver="$(_plugin_meta "$name" "version")"
+    desc="$(_plugin_meta "$name" "description")"
+    deps="$(_plugin_meta "$name" "dependencies")"
+    _info "Name:         $name"
+    _info "Version:      ${ver:-(unknown)}"
+    _info "Description:  ${desc:-(none)}"
+    [[ -n "$deps" ]] && _info "Dependencies: $deps"
+  fi
+
+  # Safety check
+  _check_plugin_safety "$name" || true
+
+  # Already enabled?
+  if _conf_is_enabled "$name"; then
+    _ok "$name is already enabled in plugins.conf"
+    return 0
+  fi
+
+  _confirm "Enable plugin '$name'?" || { _info "Aborted."; return 0; }
+
+  _conf_add "$name"
+  _ok "Plugin '$name' enabled in plugins.conf"
+  _info "Restart your shell or run: zl reload"
+  _log "install plugin $name: OK"
+}
+
+# ── zl remove plugin <name> ───────────────────────────────────────────────────
+cmd_remove_plugin() {
+  local name="${1:-}"
+  if [[ -z "$name" ]]; then
+    _err "Usage: zl remove plugin <name>"
+    return 1
+  fi
+  if ! _valid_name "$name"; then
+    _err "Invalid plugin name: '$name'"
+    return 1
+  fi
+
+  _section "Remove Plugin: $name"
+  _log "remove plugin $name"
+
+  if ! _conf_is_enabled "$name"; then
+    _warn "'$name' is not currently enabled — nothing to remove from conf"
+  fi
+
+  _confirm "Disable plugin '$name' and remove from plugins.conf?" || {
+    _info "Aborted."
+    return 0
+  }
+
+  _conf_remove "$name"
+  _ok "Plugin '$name' removed from plugins.conf"
+  _info "Plugin files kept at: $ZL_PLUGINS_DIR/$name"
+  _info "Restart shell or run: zl reload"
+  _log "remove plugin $name: OK"
+}
+
+# ── zl enable plugin <name> ───────────────────────────────────────────────────
+cmd_enable_plugin() {
+  local name="${1:-}"
+  [[ -z "$name" ]] && { _err "Usage: zl enable plugin <name>"; return 1; }
+  ! _valid_name "$name" && { _err "Invalid plugin name: '$name'"; return 1; }
+
+  [[ -f "$ZL_PLUGINS_DIR/$name/init.zsh" ]] || {
+    _err "Plugin '$name' not found at $ZL_PLUGINS_DIR/$name/init.zsh"
+    return 1
+  }
+
+  if _conf_is_enabled "$name"; then
+    _ok "'$name' is already enabled"
+    return 0
+  fi
+
+  _conf_add "$name"
+  _ok "Enabled: $name"
+  _info "Restart shell or run: zl reload"
+  _log "enable plugin $name: OK"
+}
+
+# ── zl disable plugin <name> ──────────────────────────────────────────────────
+cmd_disable_plugin() {
+  local name="${1:-}"
+  [[ -z "$name" ]] && { _err "Usage: zl disable plugin <name>"; return 1; }
+  ! _valid_name "$name" && { _err "Invalid plugin name: '$name'"; return 1; }
+
+  if ! _conf_is_enabled "$name"; then
+    _warn "'$name' is not enabled — nothing to disable"
+    return 0
+  fi
+
+  _conf_remove "$name"
+  _ok "Disabled: $name  (files kept)"
+  _info "Restart shell or run: zl reload"
+  _log "disable plugin $name: OK"
+}
+
+# ── zl list plugins ───────────────────────────────────────────────────────────
+cmd_list_plugins() {
+  _section "Plugins"
+  printf "\n"
+
+  if [[ ! -d "$ZL_PLUGINS_DIR" ]]; then
+    _warn "Plugin directory not found: $ZL_PLUGINS_DIR"
+    return 0
+  fi
+
+  local -a enabled_names=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && enabled_names+=("$line")
+  done < <(_conf_enabled)
+
+  local found=0
+  local name ver desc status_label status_color
+
+  # Header — 2-space indent on all rows including separator
+  printf "  ${C_BOLD}%-18s %-9s %-12s %s${C_RESET}\n" \
+    "NAME" "VERSION" "STATUS" "DESCRIPTION"
+  printf "  ${C_BLUE}${C_DIM}%s${C_RESET}\n" \
+    "──────────────────────────────────────────────────────────────────"
+
+  for plugin_dir in "$ZL_PLUGINS_DIR"/*/; do
+    [[ -d "$plugin_dir" ]] || continue
+    name="$(basename "$plugin_dir")"
+
+    # Skip any directory whose name is not a valid plugin name
+    _valid_name "$name" || continue
+
+    ver="$(_plugin_meta "$name" "version")"
+    desc="$(_plugin_meta "$name" "description")"
+    [[ -z "$ver" ]]  && ver="?"
+    [[ -z "$desc" ]] && desc="(no metadata)"
+
+    # Determine status
+    local is_enabled=0
+    local en
+    if (( ${#enabled_names[@]} > 0 )); then
+      for en in "${enabled_names[@]}"; do
+        [[ "$en" == "$name" ]] && is_enabled=1 && break
+      done
+    fi
+
+    local has_init=1
+    [[ -f "$plugin_dir/init.zsh" ]] || has_init=0
+
+    # Status: keep label and color SEPARATE so %-Ns width counts only visible chars
+    if (( ! has_init )); then
+      status_label="✗ broken"
+      status_color="$C_RED"
+    elif (( is_enabled )); then
+      status_label="● enabled"
+      status_color="$C_GREEN"
+    else
+      status_label="○ disabled"
+      status_color="$C_GRAY"
+    fi
+
+    # printf columns use only plain strings for width — color applied around them
+    printf "  ${C_WHITE}%-18s${C_RESET} ${C_GRAY}%-9s${C_RESET} ${status_color}%-12s${C_RESET} ${C_DIM}%s${C_RESET}\n" \
+      "$name" \
+      "v${ver}" \
+      "$status_label" \
+      "${desc:0:55}"
+    found=1
+  done
+
+  (( found )) || _info "No plugins found in $ZL_PLUGINS_DIR"
+  printf "\n"
+}
+
+# ── zl list installed ─────────────────────────────────────────────────────────
+cmd_list_installed() {
+  _section "Enabled Plugins"
+  printf "\n"
+
+  local -a names=()
+  while IFS= read -r line; do
+    [[ -n "$line" ]] && names+=("$line")
+  done < <(_conf_enabled)
+
+  if (( ${#names[@]} == 0 )); then
+    _warn "No plugins enabled (plugins.conf is empty or missing)"
+    return 0
+  fi
+
+  local name ver desc deps
+  for name in "${names[@]}"; do
+    ver="$(_plugin_meta "$name" "version")"
+    desc="$(_plugin_meta "$name" "description")"
+    deps="$(_plugin_meta "$name" "dependencies")"
+    local has_init=""
+    [[ -f "$ZL_PLUGINS_DIR/$name/init.zsh" ]] && \
+      has_init="${C_GREEN}✓${C_RESET}" || \
+      has_init="${C_RED}✗ init.zsh missing${C_RESET}"
+
+    printf "  ${C_WHITE}${C_BOLD}%-20s${C_RESET}  v%-8s  %b\n" \
+      "$name" "${ver:-?}" "$has_init"
+    [[ -n "$desc" ]]  && printf "  ${C_GRAY}%-20s  %s${C_RESET}\n" "" "$desc"
+    [[ -n "$deps" ]]  && printf "  ${C_GRAY}%-20s  deps: %s${C_RESET}\n" "" "$deps"
+  done
+  printf "\n"
+}
+
+# ── zl reload ─────────────────────────────────────────────────────────────────
+cmd_reload() {
+  _section "Reload"
+  printf "\n"
+
+  # ── Parent shell detection ────────────────────────────────────────────────
+  # bin/zl runs as a bash subprocess — ZSH_VERSION is NOT visible here.
+  # Detection order (most to least reliable):
+  #   1. ZL_SHELL — exported by loader.zsh when sourced inside zsh
+  #   2. ps -p $PPID — inspect the actual parent process name
+  #   3. $SHELL — env var (set by the login shell, not the current process)
+  local in_zsh=0
+  local _parent_shell=""
+
+  if [[ "${ZL_SHELL:-}" == "zsh" ]]; then
+    _parent_shell="zsh"
+  else
+    _parent_shell="$(ps -p "$PPID" -o comm= 2>/dev/null || true)"
+    [[ -z "$_parent_shell" ]] && _parent_shell="${SHELL##*/}"
+  fi
+  [[ "$_parent_shell" == *zsh* ]] && in_zsh=1
+
+  if (( in_zsh )); then
+    _info "You are in a Zsh session — reload is one command away."
+    printf "\n"
+    printf "  ${C_BOLD}Recommended:${C_RESET}\n"
+    printf "  ${C_GREEN}  exec zsh${C_RESET}                     — restart shell in-place (fastest)\n"
+    printf "\n"
+    printf "  ${C_BOLD}Alternatives:${C_RESET}\n"
+    printf "  ${C_YELLOW}  source ~/.zshrc${C_RESET}              — reload config without new process\n"
+    printf "  ${C_YELLOW}  zl-reload${C_RESET}                    — alias for source ~/.zshrc\n"
+    printf "  ${C_YELLOW}  source \$ZL_HOME/core/loader.zsh${C_RESET} — reload ZeroLinux only\n"
+    printf "\n"
+
+    # Offer to exec zsh directly — skip prompt with --yes
+    if (( ZL_YES )); then
+      _info "Running: exec zsh"
+      exec zsh
+    else
+      printf "  ${C_YELLOW}?${C_RESET}  Run ${C_GREEN}exec zsh${C_RESET} now? [y/N] "
+      local _reply
+      read -r _reply
+      if [[ "$_reply" =~ ^[Yy]$ ]]; then
+        exec zsh
+      else
+        _info "Skipped. Run ${C_GREEN}exec zsh${C_RESET} when ready."
+      fi
+    fi
+  else
+    # Not inside zsh — generic instructions only
+    _info "ZeroLinux must be reloaded inside a running Zsh session."
+    printf "\n"
+    printf "  ${C_BOLD}Run one of:${C_RESET}\n"
+    printf "  ${C_YELLOW}  exec zsh${C_RESET}                     — restart shell in-place\n"
+    printf "  ${C_YELLOW}  source ~/.zshrc${C_RESET}              — reload config in current shell\n"
+    printf "  ${C_YELLOW}  zl-reload${C_RESET}                    — alias (same as source ~/.zshrc)\n"
+    printf "\n"
+    printf "  ${C_DIM}Note: 'zl reload' cannot reload the parent shell from a subprocess.${C_RESET}\n"
+    printf "\n"
+  fi
+}
+
+# ── zl doctor ────────────────────────────────────────────────────────────────
+cmd_doctor() {
+  # Delegates to doctor.sh if it exists, otherwise runs inline checks
+  local doctor_script="$ZL_HOME/doctor.sh"
+  if [[ -x "$doctor_script" ]]; then
+    _log "doctor: delegating to doctor.sh"
+    bash "$doctor_script"
+  else
+    _section "Doctor (inline)"
+    _warn "doctor.sh not found at $doctor_script — running basic checks"
+    _check_core_files
+    _check_plugins_basic
+  fi
+  # ── Growth loop (once per session, non-intrusive) ─────────────────────────
+  if [[ -z "${ZL_STAR_SHOWN:-}" ]]; then
+    export ZL_STAR_SHOWN=1
+    printf "\n  ${C_DIM}⭐  Enjoying ZeroLinux? Star it → https://github.com/zerolinux/terminal${C_RESET}\n\n"
+  fi
+}
+
+# ── zl registry list ──────────────────────────────────────────────────────────
+cmd_registry_list() {
+  local registry="$ZL_HOME/config/registry.json"
+  _section "Plugin Registry"
+
+  if ! command -v jq >/dev/null 2>&1; then
+    _warn "jq not found — registry requires jq"
+    _info "Install: sudo pacman -S jq  OR  sudo apt-get install jq"
+    return 1
+  fi
+
+  if [[ ! -f "$registry" ]]; then
+    _warn "Registry not found: $registry"
+    _info "Run: zl update  to refresh registry"
+    return 0
+  fi
+
+  printf "\n"
+  jq -r '.plugins[] | "  \(.name)|\(.version)|\(.description)"' "$registry" \
+    2>/dev/null \
+  | while IFS='|' read -r name ver desc; do
+      printf "  ${C_WHITE}%-20s${C_RESET} v%-8s  ${C_DIM}%s${C_RESET}\n" \
+        "$name" "$ver" "$desc"
+    done
+
+  printf "\n  ${C_DIM}Want more plugins? → https://github.com/zerolinux/terminal${C_RESET}\n\n"
+}
+
+_check_core_files() {
+  local -a core=(loader.zsh logger.zsh utils.zsh plugin_manager.zsh config.zsh)
+  local f
+  for f in "${core[@]}"; do
+    local fp="$ZL_HOME/core/$f"
+    if [[ -f "$fp" && -r "$fp" ]]; then
+      _ok "core/$f"
+    else
+      _err "core/$f  MISSING or unreadable"
+    fi
+  done
+}
+
+_check_plugins_basic() {
+  while IFS= read -r name; do
+    [[ -z "$name" ]] && continue
+    if [[ -f "$ZL_PLUGINS_DIR/$name/init.zsh" ]]; then
+      _ok "Plugin: $name"
+    else
+      _err "Plugin: $name  (init.zsh MISSING)"
+    fi
+  done < <(_conf_enabled)
+}
+
+# =============================================================================
+# MAIN DISPATCHER
+# =============================================================================
+main() {
+  # Parse global flags
+  local -a args=()
+  local a
+  for a in "$@"; do
+    case "$a" in
+      --yes|-y) ZL_YES=1 ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  set -- "${args[@]+"${args[@]}"}"
+
+  local cmd="${1:-help}"
+  shift 2>/dev/null || true
+
+  case "$cmd" in
+    # Plugin management
+    install)
+      local sub="${1:-}"; shift 2>/dev/null || true
+      case "$sub" in
+        plugin|plug) cmd_install_plugin "$@" ;;
+        *) _err "Usage: zl install plugin <name>"; return 1 ;;
+      esac ;;
+
+    remove|rm)
+      local sub="${1:-}"; shift 2>/dev/null || true
+      case "$sub" in
+        plugin|plug) cmd_remove_plugin "$@" ;;
+        *) _err "Usage: zl remove plugin <name>"; return 1 ;;
+      esac ;;
+
+    enable)
+      local sub="${1:-}"; shift 2>/dev/null || true
+      case "$sub" in
+        plugin|plug) cmd_enable_plugin "$@" ;;
+        *) _err "Usage: zl enable plugin <name>"; return 1 ;;
+      esac ;;
+
+    disable)
+      local sub="${1:-}"; shift 2>/dev/null || true
+      case "$sub" in
+        plugin|plug) cmd_disable_plugin "$@" ;;
+        *) _err "Usage: zl disable plugin <name>"; return 1 ;;
+      esac ;;
+
+    list|ls)
+      local sub="${1:-plugins}"; shift 2>/dev/null || true
+      case "$sub" in
+        plugins|plugin)   cmd_list_plugins   ;;
+        installed|active) cmd_list_installed ;;
+        *) _err "Usage: zl list [plugins|installed]"; return 1 ;;
+      esac ;;
+
+    registry)
+      local sub="${1:-list}"; shift 2>/dev/null || true
+      case "$sub" in
+        list|ls) cmd_registry_list ;;
+        *) _err "Usage: zl registry list"; return 1 ;;
+      esac ;;
+
+    # System
+    doctor|diag|check)   cmd_doctor  ;;
+    reload)              cmd_reload  ;;
+    version|--version|-V) cmd_version ;;
+    help|-h|--help)      cmd_help    ;;
+
+    # Unknown
+    *)
+      _err "Unknown command: '$cmd'"
+      printf "\n"
+      cmd_help
+      return 1
+      ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          echo "package=zerolinux-v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify VERSION file matches tag
+        run: |
+          FILE_VER=$(cat VERSION)
+          TAG_VER="${{ steps.version.outputs.version }}"
+          if [ "$FILE_VER" != "$TAG_VER" ]; then
+            echo "ERROR: VERSION file ($FILE_VER) does not match tag ($TAG_VER)"
+            exit 1
+          fi
+          echo "✓ VERSION matches tag: $TAG_VER"
+
+      - name: Run CI checks
+        run: |
+          echo "Running syntax checks..."
+          failed=0
+          for f in install.sh uninstall.sh doctor.sh bin/zl; do
+            bash -n "$f" && echo "  ✓ $f" || { echo "  ✗ $f"; failed=$((failed+1)); }
+          done
+          [ $failed -eq 0 ] || { echo "Syntax check failed — aborting release"; exit 1; }
+
+      - name: Set permissions
+        run: |
+          chmod +x install.sh uninstall.sh doctor.sh bin/zl
+          chmod 644 core/*.zsh config/*.zsh config/*.json \
+                    plugins/*/*.zsh plugins/*/*.zl || true
+
+      - name: Build release tarball
+        run: |
+          PKG="${{ steps.version.outputs.package }}"
+          mkdir -p dist
+          tar -czf "dist/${PKG}.tar.gz" \
+            --exclude='.git' \
+            --exclude='dist' \
+            --exclude='.github' \
+            --exclude='*.bak' \
+            --exclude='*.log' \
+            --transform "s|^\.|${PKG}|" \
+            .
+          echo "✓ Built: dist/${PKG}.tar.gz ($(du -sh dist/${PKG}.tar.gz | cut -f1))"
+
+      - name: Generate SHA-256 checksum
+        run: |
+          PKG="${{ steps.version.outputs.package }}"
+          cd dist
+          sha256sum "${PKG}.tar.gz" > "${PKG}.sha256"
+          echo "✓ SHA-256: $(cat ${PKG}.sha256)"
+
+      - name: Extract release notes from CHANGELOG
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Extract the section for this version from CHANGELOG.md
+          awk "/^## \[${VERSION}\]/{found=1; next} found && /^## \[/{exit} found{print}" \
+            CHANGELOG.md > release_notes.md
+          if [ ! -s release_notes.md ]; then
+            echo "No changelog entry found for v${VERSION}" > release_notes.md
+          fi
+          echo "Release notes preview:"
+          head -10 release_notes.md
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "ZeroLinux Terminal v${{ steps.version.outputs.version }}"
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            dist/${{ steps.version.outputs.package }}.tar.gz
+            dist/${{ steps.version.outputs.package }}.sha256

@@ -1,0 +1,6 @@
+name        = example
+version     = 2.1.1
+description = Reference plugin — copy this to create your own
+dependencies =
+requires_zl = 2.0.0
+author      = ZeroLinux Team

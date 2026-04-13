@@ -1,0 +1,61 @@
+name: Feature Request
+description: Suggest an improvement or new capability
+title: "[feat]: "
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a feature request, check that it aligns with ZeroLinux's
+        three principles: faster startup, better plugin safety, or more user control.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation where you needed this but couldn't do it.
+      placeholder: |
+        When I use ZeroLinux on multiple machines, I have to manually sync my
+        plugins.conf. There's no built-in way to export/import my setup.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How would you like it to work? Be as specific as possible.
+      placeholder: |
+        A `zl export` command that produces a portable dotfile snippet, and a
+        `zl import` that reads it and enables the listed plugins.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Other approaches you thought of and why they didn't work.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Core framework
+        - CLI (zl command)
+        - New plugin
+        - Existing plugin improvement
+        - Install / uninstall
+        - Doctor / diagnostics
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context
+      description: Screenshots, links to similar features in other tools, or anything else helpful.

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ask a question / share your setup
+    url: https://github.com/zerolinux/terminal/discussions
+    about: Use Discussions for questions, setup sharing, and general conversation.
+  - name: Security vulnerability
+    url: https://github.com/zerolinux/terminal/security/advisories/new
+    about: Report a security issue privately — do not use a public issue.

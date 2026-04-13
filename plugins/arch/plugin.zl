@@ -1,0 +1,6 @@
+name        = arch
+version     = 2.1.1
+description = Arch Linux pacman and AUR helper utilities (Arch only)
+dependencies =
+requires_zl = 2.0.0
+author      = ZeroLinux Team

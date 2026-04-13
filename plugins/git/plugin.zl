@@ -1,0 +1,6 @@
+name        = git
+version     = 2.1.1
+description = Interactive Git tools powered by fzf (branch switcher, log browser, stash manager)
+dependencies =
+requires_zl = 2.0.0
+author      = ZeroLinux Team

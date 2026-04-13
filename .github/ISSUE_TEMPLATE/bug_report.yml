@@ -1,0 +1,88 @@
+name: Bug Report
+description: Something is broken or behaving unexpectedly
+title: "[bug]: "
+labels: ["bug", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a bug.
+        Please fill in every section — incomplete reports take longer to resolve.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear description of the bug. What did you see vs. what did you expect?
+      placeholder: |
+        When I run `zl doctor`, it shows FAIL for plugin 'git' even though git is installed.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands that trigger the bug.
+      placeholder: |
+        1. exec zsh
+        2. zl doctor
+        3. Observe the FAIL output
+    validations:
+      required: true
+
+  - type: textarea
+    id: doctor_output
+    attributes:
+      label: Output of `zl doctor`
+      description: Run `zl doctor` and paste the full output here.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: debug_output
+    attributes:
+      label: Debug output (optional but helpful)
+      description: Run `ZL_LOG_LEVEL=0 zsh -i -c "zl doctor"` and paste the output.
+      render: shell
+
+  - type: input
+    id: zsh_version
+    attributes:
+      label: Zsh version
+      description: Output of `zsh --version`
+      placeholder: "zsh 5.9 (x86_64-pc-linux-gnu)"
+    validations:
+      required: true
+
+  - type: input
+    id: zl_version
+    attributes:
+      label: ZeroLinux version
+      description: Output of `zl version` or `cat ~/.zerolinux/VERSION`
+      placeholder: "2.1.1"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "Arch Linux (2025-04), Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: plugins_conf
+    attributes:
+      label: Enabled plugins
+      description: Output of `cat ~/.zerolinux/core/plugins.conf`
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Additional context, workarounds, or related issues.
