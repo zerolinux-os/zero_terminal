@@ -23,6 +23,7 @@ if [[ -t 1 ]]; then
   C_GREEN=$'\033[0;32m'; C_YELLOW=$'\033[1;33m'; C_RED=$'\033[1;31m'
   C_WHITE=$'\033[1;37m'; C_GRAY=$'\033[2;37m'
 else
+  # shellcheck disable=SC2034
   C_RESET='' C_BOLD='' C_DIM='' C_BLUE='' C_CYAN=''
   C_GREEN='' C_YELLOW='' C_RED='' C_WHITE='' C_GRAY=''
 fi
@@ -542,9 +543,9 @@ check_config() {
   # User config
   local user_cfg="${ZDOTDIR:-$HOME}/.zerolinuxrc"
   if [[ -f "$user_cfg" ]]; then
-    _pass "~/.zerolinuxrc: present"
+    _pass "$HOME/.zerolinuxrc: present"
     if [[ -r "$user_cfg" ]]; then
-      _pass "~/.zerolinuxrc: readable"
+      _pass "$HOME/.zerolinuxrc: readable"
     else
       _fail "~/.zerolinuxrc: not readable"
       _hint "Fix: chmod 600 $user_cfg"
