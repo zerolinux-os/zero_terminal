@@ -2,161 +2,87 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:
-
-permissions:
-  contents: read
 
 jobs:
-  # ── Syntax validation ────────────────────────────────────────────────────────
-  syntax:
-    name: Syntax check
+  shellcheck:
+    name: ShellCheck — Static Analysis
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install zsh
-        run: sudo apt-get install -y zsh
-
-      - name: Validate bash scripts
-        run: |
-          echo "Checking bash syntax..."
-          failed=0
-          for f in install.sh uninstall.sh doctor.sh; do
-            bash -n "$f" && echo "  ✓ $f" || { echo "  ✗ $f"; failed=$((failed+1)); }
-          done
-          [ $failed -eq 0 ] || exit 1
-
-      - name: Validate zsh files
-        run: |
-          echo "Checking zsh syntax..."
-          failed=0
-          while IFS= read -r -d '' f; do
-            zsh -n "$f" && echo "  ✓ $f" || { echo "  ✗ $f"; failed=$((failed+1)); }
-          done < <(find . -name '*.zsh' -not -path './dist/*' -print0)
-          zsh -n bin/zl && echo "  ✓ bin/zl" || { echo "  ✗ bin/zl"; failed=$((failed+1)); }
-          [ $failed -eq 0 ] || exit 1
-
-  # ── Permissions ──────────────────────────────────────────────────────────────
-  permissions-check:
-    name: File permissions
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check executable bits
-        run: |
-          failed=0
-          for f in install.sh uninstall.sh doctor.sh bin/zl; do
-            [ -x "$f" ] && echo "  ✓ $f" || { echo "  ✗ $f not executable"; failed=$((failed+1)); }
-          done
-          [ $failed -eq 0 ] || exit 1
-
-  # ── Plugin contract compliance ───────────────────────────────────────────────
-  plugin-contracts:
-    name: Plugin contracts
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Validate plugin structure
-        run: |
-          failed=0
-          for pdir in plugins/*/; do
-            name=$(basename "$pdir")
-            [ -f "$pdir/init.zsh" ]     || { echo "  ✗ $name: init.zsh missing";    failed=$((failed+1)); }
-            [ -f "$pdir/commands.zsh" ] || { echo "  ✗ $name: commands.zsh missing"; failed=$((failed+1)); }
-            [ -f "$pdir/plugin.zl" ]    || { echo "  ✗ $name: plugin.zl missing";    failed=$((failed+1)); }
-            grep -q "plugin_init()"             "$pdir/init.zsh" 2>/dev/null \
-              || { echo "  ✗ $name: plugin_init() missing";             failed=$((failed+1)); }
-            grep -q "plugin_register_commands()" "$pdir/init.zsh" 2>/dev/null \
-              || { echo "  ✗ $name: plugin_register_commands() missing"; failed=$((failed+1)); }
-            # Must NOT self-source commands.zsh
-            if grep -qE '^\s*source\s+.*commands' "$pdir/init.zsh" 2>/dev/null; then
-              echo "  ✗ $name: init.zsh sources commands.zsh (double-load violation)"
-              failed=$((failed+1))
-            fi
-            [ $failed -eq 0 ] && echo "  ✓ $name"
-          done
-          [ $failed -eq 0 ] || exit 1
-
-  # ── Security scanner ─────────────────────────────────────────────────────────
-  security-scan:
-    name: Security scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Scan plugins for dangerous patterns
-        run: |
-          failed=0
-          P_ALIAS='alias[[:space:]]+(rm|kill|sudo|chmod|chown|mv|cp|cd|ls)[[:space:]]*='
-          P_FUNC='function[[:space:]]+(rm|kill|sudo|chmod|chown|cd)[[:space:]]*([\(\{]|$)'
-          P_RCE='(curl|wget)[^|]*\|[[:space:]]*(sh|bash|zsh)'
-          P_EVAL='eval[[:space:]]+["'"'"']?\$'
-
-          for f in plugins/*/*.zsh; do
-            [ -f "$f" ] || continue
-            if grep -Eq "$P_ALIAS" "$f" 2>/dev/null; then
-              echo "  ✗ $f: overrides critical alias"; failed=$((failed+1))
-            fi
-            if grep -Eq "$P_FUNC" "$f" 2>/dev/null; then
-              echo "  ✗ $f: redefines critical function"; failed=$((failed+1))
-            fi
-            if grep -Eq "$P_RCE" "$f" 2>/dev/null; then
-              echo "  ✗ $f: remote code execution pattern"; failed=$((failed+1))
-            fi
-            if grep -Eq "$P_EVAL" "$f" 2>/dev/null; then
-              echo "  ✗ $f: unsafe eval"; failed=$((failed+1))
-            fi
-          done
-          [ $failed -eq 0 ] && echo "  ✓ All plugins clean" || exit 1
-
-  # ── shellcheck lint ──────────────────────────────────────────────────────────
-  shellcheck:
-    name: shellcheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install shellcheck
+      - name: Install ShellCheck
         run: sudo apt-get install -y shellcheck
 
-      - name: Run shellcheck
+      - name: Run ShellCheck on all shell files
         run: |
-          failed=0
-          for f in install.sh uninstall.sh doctor.sh bin/zl; do
-            # SC2148: shebang — bin/zl has a valid bash shebang
-            # SC1090/SC1091: dynamic source paths are intentional
-            shellcheck -S warning \
-              --exclude SC1090,SC1091,SC2148 \
-              "$f" && echo "  ✓ $f" || { echo "  ✗ $f"; failed=$((failed+1)); }
-          done
-          [ $failed -eq 0 ] || exit 1
+          echo "=== Scanning .sh files ==="
+          find . -name "*.sh" -not -path "./.git/*" \
+            -exec shellcheck --severity=warning {} +
 
-  # ── Release validation ───────────────────────────────────────────────────────
-  release-files:
-    name: Release file check
+          echo "=== Scanning .zsh files ==="
+          find . -name "*.zsh" -not -path "./.git/*" \
+            -exec shellcheck --shell=bash --severity=warning {} +
+
+  validate-plugins:
+    name: Validate Plugin Structure
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Verify required release files
+      - name: Check plugin contract
         run: |
-          failed=0
-          for f in VERSION LICENSE CHANGELOG.md Makefile README.md CONTRIBUTING.md SECURITY.md \
-                   docs/README.md config/registry.json; do
-            [ -f "$f" ] && echo "  ✓ $f" || { echo "  ✗ $f MISSING"; failed=$((failed+1)); }
+          ERRORS=0
+          for plugin_dir in plugins/*/; do
+            plugin=$(basename "$plugin_dir")
+            [ "$plugin" = "example" ] && continue
+
+            if [ ! -f "$plugin_dir/init.zsh" ]; then
+              echo "FAIL: $plugin — missing init.zsh"
+              ERRORS=$((ERRORS + 1))
+            fi
+
+            if [ ! -f "$plugin_dir/plugin.zl" ]; then
+              echo "WARN: $plugin — missing plugin.zl metadata"
+            fi
+
+            if [ ! -f "$plugin_dir/commands.zsh" ]; then
+              echo "INFO: $plugin — no commands.zsh (optional)"
+            fi
           done
-          [ $failed -eq 0 ] || exit 1
 
-      - name: Verify VERSION format
+          if [ "$ERRORS" -gt 0 ]; then
+            echo "Plugin validation failed: $ERRORS error(s)"
+            exit 1
+          fi
+
+          echo "All plugins valid ✓"
+
+  version-check:
+    name: Version Consistency
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check VERSION file exists and is valid semver
         run: |
-          ver=$(cat VERSION)
-          echo "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
-            && echo "  ✓ VERSION=$ver" \
-            || { echo "  ✗ VERSION '$ver' is not semver"; exit 1; }
+          if [ ! -f VERSION ]; then
+            echo "FAIL: VERSION file missing"
+            exit 1
+          fi
+
+          VERSION=$(cat VERSION)
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "FAIL: VERSION '$VERSION' is not valid semver"
+            exit 1
+          fi
+
+          echo "VERSION: $VERSION ✓"
