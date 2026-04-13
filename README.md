@@ -155,7 +155,7 @@ ZeroLinux ships four production-ready plugins. Enable what you need, ignore the 
 Interactive Git tooling powered by fzf.
 
 ```bash
-gbr          # fzf branch switcher with live log preview
+gbr          # interactively switch branches with live log preview
 glog         # interactive commit browser → opens in $PAGER
 gstash       # fzf stash manager (pop, drop, preview)
 groh         # reset to origin/current-branch safely
