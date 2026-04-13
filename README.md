@@ -224,6 +224,26 @@ Flags:
 
 ---
 
+## CLI preview
+
+### Example
+
+```bash
+zl help
+
+zl <command> [subcommand]
+
+Plugin management:
+  enable plugin <name>
+  disable plugin <name>
+
+System:
+  doctor
+  reload
+```
+
+---
+
 ## Configuration
 
 Override defaults in `~/.zerolinuxrc` — ZeroLinux sources it automatically:
