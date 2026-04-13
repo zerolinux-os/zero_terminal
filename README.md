@@ -14,6 +14,7 @@
 **A Zsh framework that starts fast, isolates plugins, and tells you exactly what's happening.**
 
 ![ZeroLinux Terminal Demo](assets/demo.gif)
+![ZeroLinux Screenshot](assets/screenshot.png)
 
 [![Version](https://img.shields.io/badge/version-2.1.1-blue?style=flat-square)](https://github.com/zerolinux-os/zero_terminal/releases)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
