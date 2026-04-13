@@ -12,7 +12,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 [![Shell](https://img.shields.io/badge/shell-zsh%205.3%2B-orange?style=flat-square)](https://www.zsh.org/)
 
-[Install](#-quick-install) · [Plugins](#-plugins) · [CLI](#-cli-reference) · [Docs](././docs/README.md)
+[Install](#-quick-install) · [Plugins](#-plugins) · [CLI](#-cli-reference) · [Docs](./docs/README.md)
 
 </div>
 
@@ -21,6 +21,7 @@
 ## ⚡ The 60-Second Experience
 
 Watch the demo above to see ZeroLinux in action:
+
 1. **Instant Setup:** Full installation in seconds.
 2. **Hot Reload:** `exec zsh` and everything is ready.
 3. **Plugin Lifecycle:** Enable/Disable plugins without breaking your shell.
@@ -34,7 +35,7 @@ To replicate the demo, run the following commands:
 
 ```bash
 # 1. Clone the repository
-git clone [https://github.com/zerolinux-os/zero_terminal](https://github.com/zerolinux-os/zero_terminal) ~/.zerolinux-src
+git clone https://github.com/zerolinux-os/zero_terminal ~/.zerolinux-src
 
 # 2. Run the installer (Unattended mode)
 bash ~/.zerolinux-src/install.sh --yes
@@ -42,14 +43,73 @@ bash ~/.zerolinux-src/install.sh --yes
 # 3. Start using it
 exec zsh
 ```
-## 🧪 60-Second Test Drive
-After installing, try this flow to see the power of ZeroLinux:
-1. `zl list plugins` — See what's active.
-2. `zl disable plugin git` — Test the lifecycle.
-3. `zl enable plugin git` — Bring it back.
-4. `gst` — Try the interactive Git status in any repo.
-```
+
 > **Requirements:** zsh ≥ 5.3 · git · curl or wget
+
+---
+
+## 🧪 60-Second Test Drive
+
+After installing, reproduce exactly what you saw in the demo:
+
+**1. Reload your shell and confirm active plugins:**
+
+```bash
+exec zsh
+echo $ZL_PLUGINS
+# git system
+```
+
+**2. Try the interactive Git status (`gst`) in a real repo:**
+
+```bash
+mkdir ~/zl-test && cd ~/zl-test
+git init
+touch a.txt
+git add .
+gst
+# ## No commits yet on master
+# A  a.txt
+```
+
+**3. Browse all available plugins:**
+
+```bash
+zl list plugins
+```
+
+```
+  NAME               VERSION   STATUS       DESCRIPTION
+  ──────────────────────────────────────────────────────────────────
+  arch               v2.1.1    ○ disabled   Arch Linux pacman and AUR helper utilities (Arch only)
+  docker             v2.1.1    ○ disabled   Docker aliases, interactive container management
+  example            v1.0.0    ○ disabled   Reference plugin — copy this to create your own
+  git                v2.1.1    ● enabled    Interactive Git tools powered by fzf
+  system             v2.1.1    ● enabled    System monitoring: sysinfo, memtop, fkill, portopen
+```
+
+**4. Test the plugin lifecycle — disable then re-enable:**
+
+```bash
+zl disable plugin git
+# ✓  Disabled: git  (files kept)
+
+zl enable plugin git
+# ✓  Enabled: git
+```
+
+**5. Confirm everything still works after re-enabling:**
+
+```bash
+cd ~
+mkdir zl-demo && cd zl-demo
+git init
+touch demo.txt
+git add .
+gst
+# ## No commits yet on master
+# A  demo.txt
+```
 
 ---
 
@@ -72,17 +132,6 @@ $ zl doctor
 
   PASS: 24   WARN: 0   FAIL: 0
   ✅  System is healthy
-```
-
-```
-$ zl list plugins
-
-  NAME                 VERSION    STATUS                DESCRIPTION
-  ─────────────────────────────────────────────────────────────────
-  git                  v2.1.1     ● loaded              Interactive Git tools
-  system               v2.1.1     ● loaded              System monitoring
-  docker               v2.1.1     ○ disabled            Container management
-  arch                 v2.1.1     ○ disabled            Arch Linux / pacman
 ```
 
 ---
