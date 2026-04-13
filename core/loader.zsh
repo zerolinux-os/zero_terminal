@@ -120,7 +120,7 @@ fi
 
 _zl_t1=$EPOCHREALTIME
 if (( _zl_t0 > 0 )); then
-  integer _zl_elapsed=$(( (_zl_t1 - _zl_t0) * 1000 + 0.5 ))
+  _zl_elapsed=$(awk "BEGIN {printf \"%d\", (${_zl_t1} - ${_zl_t0}) * 1000 + 0.5}")
   zl::log::debug "Total load time: ${_zl_elapsed}ms"
   (( _zl_elapsed > 200 )) && \
     zl::log::warn "Slow startup (${_zl_elapsed}ms) — try disabling unused plugins"

@@ -148,6 +148,7 @@ unset _zl_zcd _zl_today _zl_dump_day
 
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|=*' 'l:|=* r:|=*'
+# shellcheck disable=SC2296
 zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
 zstyle ':completion:*:descriptions' format '%F{blue}%B── %d ──%b%f'
 zstyle ':completion:*:warnings'     format '%F{red}✗ No matches: %d%f'

@@ -183,6 +183,7 @@ zl::plugin::resolve_deps() {
     local deps="${ZL_PLUGIN_META["${node}:dependencies"]:-}"
     local dep
     if [[ -n "$deps" ]]; then
+      # shellcheck disable=SC2296
       for dep in ${(s:,:)deps}; do
         dep="$(zl::str::trim "$dep")"
         [[ -z "$dep" ]] && continue
@@ -304,7 +305,8 @@ zl::plugin::load_now() {
   # ── Timing ─────────────────────────────────────────────────────────────────
   t_end=$EPOCHREALTIME
   if (( t_start > 0 )); then
-    integer elapsed_ms=$(( (t_end - t_start) * 1000 + 0.5 ))
+    local elapsed_ms
+    elapsed_ms=$(awk "BEGIN {printf \"%d\", (${t_end} - ${t_start}) * 1000 + 0.5}")
     (( elapsed_ms > 100 )) && \
       zl::log::warn "plugin[$name]: slow load (${elapsed_ms}ms)"
     zl::log::debug "plugin[$name]: loaded in ${elapsed_ms}ms (v${ZL_PLUGIN_META["${name}:version"]:-?})"

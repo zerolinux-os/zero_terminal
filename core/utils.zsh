@@ -132,13 +132,17 @@ zl::version::gte() {
   local a="${1:-0.0.0}" b="${2:-0.0.0}"
   local -a va vb
   # Split on '.' without altering global IFS
-  IFS='.' read -rA va <<< "$a" 2>/dev/null || va=("${(s:.:)a}")
-  IFS='.' read -rA vb <<< "$b" 2>/dev/null || vb=("${(s:.:)b}")
-  local i ai bi
+  # shellcheck disable=SC2296
+  IFS='.' read -rA va <<< "$a" 2>/dev/null || { IFS='.' read -ra va <<< "$a"; }
+  # shellcheck disable=SC2296
+  IFS='.' read -rA vb <<< "$b" 2>/dev/null || { IFS='.' read -ra vb <<< "$b"; }
+  local i ai bi va_i vb_i
   for i in 1 2 3; do
     # Strip any non-numeric suffix (e.g. "1-beta" → 1); default to 0
-    ai=$(( ${${va[$i]:-0}%%[^0-9]*} + 0 ))
-    bi=$(( ${${vb[$i]:-0}%%[^0-9]*} + 0 ))
+    va_i="${va[$i]:-0}"; va_i="${va_i%%[^0-9]*}"
+    vb_i="${vb[$i]:-0}"; vb_i="${vb_i%%[^0-9]*}"
+    ai=$(( va_i + 0 ))
+    bi=$(( vb_i + 0 ))
     (( ai > bi )) && return 0
     (( ai < bi )) && return 1
   done
@@ -182,6 +186,7 @@ zl::telemetry::report() {
   [[ "${ZL_TELEMETRY:-0}" != "1" ]] && return 0
   local k
   zl::log::debug "=== Telemetry Report ==="
+  # shellcheck disable=SC2296
   for k in "${(k)ZL_TELEMETRY_DATA[@]}"; do
     zl::log::debug "  ${k}: ${ZL_TELEMETRY_DATA[$k]}"
   done
