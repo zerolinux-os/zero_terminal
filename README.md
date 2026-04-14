@@ -164,6 +164,8 @@ $ zl doctor
 
 ## Plugins
 
+> **Quality over quantity.** ZeroLinux ships 4 plugins that work perfectly and are security-scanned — instead of 300 that silently break your shell. Each plugin follows a strict contract and can be extended by the community. [Write your own →](#write-a-plugin)
+
 ZeroLinux ships four production-ready plugins. Enable what you need, ignore the rest.
 
 ### git
@@ -344,13 +346,29 @@ Removes the block from `.zshrc`, deletes `~/.zerolinux`, removes the `zl` symlin
 
 ---
 
+## ✅ Production Ready
+
+ZeroLinux is not an experiment. It is tested, versioned, and CI-verified on every commit.
+
+- **CI passes on every push** — ShellCheck static analysis on all shell files
+- **Automated plugin validation** — contract compliance checked automatically
+- **Semantic versioning** — every release follows semver strictly
+- **Safe by default** — installer never overwrites your config, always generates `restore.sh`
+- **Fully reversible** — one command uninstall, zero traces left behind
+
+---
+
 ## Contributing
+
+**Want to add a plugin?** The plugin system is designed for exactly this. Copy the `example` plugin, follow the contract, and open a PR — CI will validate everything automatically.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md). The short version:
 
 1. Fork → branch → change → test (`make test`) → PR
 2. All PRs run CI automatically
 3. New plugins must follow the contract in `plugins/example/`
+
+**Plugin ideas welcome:** kubernetes, tmux, python/virtualenv, rust/cargo, ssh manager, and more.
 
 ---
 
@@ -367,4 +385,3 @@ Built with zsh, fzf, and a lot of time spent staring at startup traces. Inspired
 [Report a bug](https://github.com/zerolinux-os/zero_terminal/issues/new?template=bug_report.yml) · [Request a feature](https://github.com/zerolinux-os/zero_terminal/issues/new?template=feature_request.yml) · [Sponsor](https://github.com/sponsors/zerolinux)
 
 </div>
-
